@@ -15,7 +15,7 @@
     <!-- 3. Babel for JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- 4. Firebase SDKs (Versi Compat - Paling stabil untuk single file) -->
+    <!-- 4. Firebase SDKs (Versi Compat) -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -151,7 +151,6 @@
             document.body.removeChild(link);
         };
         
-        // Check online status helper (5 minutes threshold)
         const isUserOnline = (lastSeen) => {
             if (!lastSeen) return false;
             const date = lastSeen.toDate ? lastSeen.toDate() : new Date(lastSeen);
@@ -200,32 +199,40 @@
             );
         };
 
-        // --- NEW: PASSWORD RESET MODAL ---
+        // Bulk Delete Confirmation Modal (UPDATED TEXT)
+        const BulkDeleteModal = ({ isOpen, onClose, onConfirm, count }) => {
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[150] p-4 fade-in">
+                    <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl border-2 border-red-100 transform scale-100 transition-all">
+                        <div className="text-center">
+                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Icons.Trash2 className="w-8 h-8 text-red-600" />
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-800 mb-2">Kosongkan Rekod</h3>
+                            <p className="text-slate-600 mb-6">Anda akan memadam <strong>{count} rekod</strong> yang terpapar.<br/><span className="text-xs text-red-500 font-semibold">Data ini akan hilang selamanya dari pangkalan data.</span></p>
+                            <div className="flex space-x-3">
+                                <button type="button" onClick={onClose} className="flex-1 bg-slate-100 text-slate-700 py-2.5 rounded-lg font-semibold hover:bg-slate-200 transition-colors">Batal</button>
+                                <button type="button" onClick={onConfirm} className="flex-1 bg-red-600 text-white py-2.5 rounded-lg font-semibold hover:bg-red-700 transition-colors shadow-lg">Ya, Kosongkan</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         const ResetPasswordModal = ({ isOpen, onClose, onConfirm, userName }) => {
             const [newPassword, setNewPassword] = useState('');
-
             if (!isOpen) return null;
             return (
                 <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[150] p-4 fade-in">
                     <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl border border-blue-100">
                         <h3 className="text-lg font-bold text-slate-800 mb-1">Reset Kata Laluan</h3>
                         <p className="text-sm text-slate-500 mb-4">Tetapkan kata laluan baharu untuk <strong>{userName}</strong>.</p>
-                        <input 
-                            type="text" 
-                            value={newPassword}
-                            onChange={(e) => setNewPassword(e.target.value)}
-                            className="w-full border border-slate-300 rounded-lg p-2 text-sm mb-4"
-                            placeholder="Kata Laluan Baru"
-                        />
+                        <input type="text" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm mb-4" placeholder="Kata Laluan Baru" />
                         <div className="flex space-x-3">
                             <button onClick={onClose} className="flex-1 bg-slate-100 text-slate-700 py-2 rounded-lg font-semibold hover:bg-slate-200 transition-colors">Batal</button>
-                            <button 
-                                onClick={() => { if(newPassword) { onConfirm(newPassword); setNewPassword(''); } }} 
-                                className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-md"
-                                disabled={!newPassword}
-                            >
-                                Simpan
-                            </button>
+                            <button onClick={() => { if(newPassword) { onConfirm(newPassword); setNewPassword(''); } }} className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-md" disabled={!newPassword}>Simpan</button>
                         </div>
                     </div>
                 </div>
@@ -528,21 +535,129 @@
             );
         };
 
-        const AdminAnalysisTab = ({ logs, allUsers, combinedLocations, combinedActivityTypes }) => {
+        // Tab 2: Analisis & Rekod (DECOUPLED - DENGAN FUNGSI PADAM DATA)
+        const AdminAnalysisTab = ({ logs, allUsers, combinedLocations, combinedActivityTypes, onDeleteLog }) => {
             const [filterMonth, setFilterMonth] = useState('');
             const [filterStaff, setFilterStaff] = useState('');
             const [filterPlace, setFilterPlace] = useState('');
             const [filterType, setFilterType] = useState('');
-            const filteredLogs = logs.filter(log => { if (!log.date) return false; const matchMonth = filterMonth ? log.date.startsWith(filterMonth) : true; const matchStaff = filterStaff ? log.userName === filterStaff : true; const matchPlace = filterPlace ? log.location === filterPlace : true; const matchType = filterType ? log.type === filterType : true; return matchMonth && matchStaff && matchPlace && matchType; });
+            const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+            const [recordToDelete, setRecordToDelete] = useState(null);
+
+            const filteredLogs = logs.filter(log => {
+                if (!log.date) return false;
+                const matchMonth = filterMonth ? log.date.startsWith(filterMonth) : true;
+                const matchStaff = filterStaff ? log.userName === filterStaff : true;
+                const matchPlace = filterPlace ? log.location === filterPlace : true;
+                const matchType = filterType ? log.type === filterType : true;
+                return matchMonth && matchStaff && matchPlace && matchType;
+            });
+
+            const handleBulkDelete = () => {
+                filteredLogs.forEach(log => {
+                    onDeleteLog(log.id);
+                });
+                setShowBulkDeleteConfirm(false);
+            };
+
+            const confirmSingleDelete = () => {
+                if (recordToDelete) {
+                    onDeleteLog(recordToDelete);
+                    setRecordToDelete(null);
+                }
+            };
 
             return (
                 <div className="space-y-6 fade-in">
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100"><h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center"><Icons.Filter className="w-5 h-5 mr-2 text-blue-600" /> Saring Rekod (Slicers)</h3><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"><div><label className="block text-xs font-semibold text-slate-500 mb-1">Bulan</label><input type="month" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500" /></div><div><label className="block text-xs font-semibold text-slate-500 mb-1">Staf</label><select value={filterStaff} onChange={(e) => setFilterStaff(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500"><option value="">Semua Staf</option>{allUsers.map((u, idx) => <option key={idx} value={u}>{u}</option>)}</select></div><div><label className="block text-xs font-semibold text-slate-500 mb-1">Lokasi</label><select value={filterPlace} onChange={(e) => setFilterPlace(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500"><option value="">Semua Lokasi</option>{combinedLocations.map((loc, idx) => <option key={idx} value={loc}>{loc}</option>)}</select></div><div><label className="block text-xs font-semibold text-slate-500 mb-1">Perkara</label><select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500"><option value="">Semua Perkara</option>{combinedActivityTypes.map((type, idx) => <option key={idx} value={type}>{type}</option>)}</select></div></div><div className="mt-4 flex justify-between items-center pt-2 border-t border-slate-50"><span className="text-sm text-slate-500">Jumlah Rekod: <strong>{filteredLogs.length}</strong></span><button onClick={() => { setFilterMonth(''); setFilterStaff(''); setFilterPlace(''); setFilterType(''); }} className="text-sm text-blue-600 hover:text-blue-800 font-medium">Kosongkan Semua</button></div></div>
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm text-left text-slate-600"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-6 py-3">Tarikh</th><th className="px-6 py-3">Nama</th><th className="px-6 py-3">Lokasi</th><th className="px-6 py-3">Perkara</th></tr></thead><tbody>{filteredLogs.length > 0 ? filteredLogs.map(log => (<tr key={log.id} className="border-b hover:bg-slate-50"><td className="px-6 py-4">{formatDate(log.date)}</td><td className="px-6 py-4 font-bold text-slate-800">{log.userName}</td><td className="px-6 py-4">{log.location}</td><td className="px-6 py-4">{log.type}</td></tr>)) : (<tr><td colSpan="4" className="px-6 py-12 text-center text-slate-400">Tiada rekod ditemui dengan saringan ini.</td></tr>)}</tbody></table></div></div>
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-bold text-slate-800 flex items-center">
+                                <Icons.Filter className="w-5 h-5 mr-2 text-blue-600" /> Analisis Rekod
+                            </h3>
+                            
+                            {/* BUTANG MERAH UNTUK PADAM REKOD (DENGAN PENGESAHAN) */}
+                            {filteredLogs.length > 0 && (
+                                <button 
+                                    onClick={() => setShowBulkDeleteConfirm(true)} 
+                                    className="flex items-center space-x-1 text-xs font-bold text-white bg-red-600 hover:bg-red-700 px-3 py-2 rounded-lg shadow-sm transition-colors"
+                                >
+                                    <Icons.Trash2 className="w-4 h-4"/> 
+                                    <span>Kosongkan Rekod (Padam Data)</span>
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div><label className="block text-xs font-semibold text-slate-500 mb-1">Bulan</label><input type="month" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500" /></div>
+                            <div><label className="block text-xs font-semibold text-slate-500 mb-1">Staf</label><select value={filterStaff} onChange={(e) => setFilterStaff(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500"><option value="">Semua Staf</option>{allUsers.map((u, idx) => <option key={idx} value={u}>{u}</option>)}</select></div>
+                            <div><label className="block text-xs font-semibold text-slate-500 mb-1">Lokasi</label><select value={filterPlace} onChange={(e) => setFilterPlace(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500"><option value="">Semua Lokasi</option>{combinedLocations.map((loc, idx) => <option key={idx} value={loc}>{loc}</option>)}</select></div>
+                            <div><label className="block text-xs font-semibold text-slate-500 mb-1">Perkara</label><select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500"><option value="">Semua Perkara</option>{combinedActivityTypes.map((type, idx) => <option key={idx} value={type}>{type}</option>)}</select></div>
+                        </div>
+                        
+                        <div className="mt-4 pt-2 border-t border-slate-50 flex justify-between items-center">
+                            <span className="text-sm text-slate-500">Jumlah: <strong>{filteredLogs.length}</strong> rekod dijumpai.</span>
+                            {/* Butang Reset Saringan (Hanya kosongkan dropdown, TIDAK padam data) */}
+                            <button onClick={() => { setFilterMonth(''); setFilterStaff(''); setFilterPlace(''); setFilterType(''); }} className="text-sm text-blue-600 hover:text-blue-800 font-medium">Reset Saringan (Filter)</button>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left text-slate-600">
+                                <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                                    <tr>
+                                        <th className="px-6 py-3">Tarikh</th>
+                                        <th className="px-6 py-3">Nama</th>
+                                        <th className="px-6 py-3">Lokasi</th>
+                                        <th className="px-6 py-3">Perkara</th>
+                                        <th className="px-6 py-3 text-right">Tindakan</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredLogs.length > 0 ? filteredLogs.map(log => (
+                                        <tr key={log.id} className="border-b hover:bg-slate-50">
+                                            <td className="px-6 py-4">{formatDate(log.date)}</td>
+                                            <td className="px-6 py-4 font-bold text-slate-800">{log.userName}</td>
+                                            <td className="px-6 py-4">{log.location}</td>
+                                            <td className="px-6 py-4">{log.type}</td>
+                                            <td className="px-6 py-4 text-right">
+                                                <button 
+                                                    onClick={() => setRecordToDelete(log.id)} 
+                                                    className="text-red-500 hover:text-red-700 p-1 bg-red-50 rounded"
+                                                    title="Padam Rekod Ini"
+                                                >
+                                                    <Icons.Trash2 className="w-4 h-4"/>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    )) : (
+                                        <tr><td colSpan="5" className="px-6 py-12 text-center text-slate-400">Tiada rekod ditemui.</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    {/* Bulk Delete Modal */}
+                    <BulkDeleteModal 
+                        isOpen={showBulkDeleteConfirm} 
+                        onClose={() => setShowBulkDeleteConfirm(false)} 
+                        onConfirm={handleBulkDelete} 
+                        count={filteredLogs.length}
+                    />
+
+                    {/* Single Delete Modal */}
+                    <DeleteConfirmationModal 
+                        isOpen={!!recordToDelete} 
+                        onClose={() => setRecordToDelete(null)} 
+                        onConfirm={confirmSingleDelete} 
+                        itemName="Rekod Log Ini" 
+                    />
                 </div>
             );
         };
 
+        // Tab 3: Statistik (DECOUPLED)
         const AdminStatsTab = ({ logs, allUsers, combinedLocations, combinedActivityTypes }) => {
             const [filterMonth, setFilterMonth] = useState(''); const [filterStaff, setFilterStaff] = useState(''); const [filterPlace, setFilterPlace] = useState(''); const [filterType, setFilterType] = useState('');
             const filteredLogs = logs.filter(log => { if (!log.date) return false; const matchMonth = filterMonth ? log.date.startsWith(filterMonth) : true; const matchStaff = filterStaff ? log.userName === filterStaff : true; const matchPlace = filterPlace ? log.location === filterPlace : true; const matchType = filterType ? log.type === filterType : true; return matchMonth && matchStaff && matchPlace && matchType; });
@@ -550,7 +665,7 @@
 
             return (
                 <div className="space-y-8 fade-in">
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100"><h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center"><Icons.Filter className="w-5 h-5 mr-2 text-blue-600" /> Saring Data Statistik</h3><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"><div><label className="block text-xs font-semibold text-slate-500 mb-1">Bulan</label><input type="month" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500" /></div><div><label className="block text-xs font-semibold text-slate-500 mb-1">Staf</label><select value={filterStaff} onChange={(e) => setFilterStaff(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500"><option value="">Semua Staf</option>{allUsers.map((u, idx) => <option key={idx} value={u}>{u}</option>)}</select></div><div><label className="block text-xs font-semibold text-slate-500 mb-1">Lokasi</label><select value={filterPlace} onChange={(e) => setFilterPlace(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500"><option value="">Semua Lokasi</option>{combinedLocations.map((loc, idx) => <option key={idx} value={loc}>{loc}</option>)}</select></div><div><label className="block text-xs font-semibold text-slate-500 mb-1">Perkara</label><select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500"><option value="">Semua Perkara</option>{combinedActivityTypes.map((type, idx) => <option key={idx} value={type}>{type}</option>)}</select></div></div><div className="mt-4 flex justify-between items-center pt-2 border-t border-slate-50"><span className="text-sm text-blue-600 hover:text-blue-800 font-medium">Reset Saringan</span><button onClick={() => { setFilterMonth(''); setFilterStaff(''); setFilterPlace(''); setFilterType(''); }} className="text-sm text-blue-600 hover:text-blue-800 font-medium">Kosongkan Semua</button></div></div>
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100"><h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center"><Icons.Filter className="w-5 h-5 mr-2 text-blue-600" /> Saring Data Statistik (Berasingan)</h3><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"><div><label className="block text-xs font-semibold text-slate-500 mb-1">Bulan</label><input type="month" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500" /></div><div><label className="block text-xs font-semibold text-slate-500 mb-1">Staf</label><select value={filterStaff} onChange={(e) => setFilterStaff(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500"><option value="">Semua Staf</option>{allUsers.map((u, idx) => <option key={idx} value={u}>{u}</option>)}</select></div><div><label className="block text-xs font-semibold text-slate-500 mb-1">Lokasi</label><select value={filterPlace} onChange={(e) => setFilterPlace(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500"><option value="">Semua Lokasi</option>{combinedLocations.map((loc, idx) => <option key={idx} value={loc}>{loc}</option>)}</select></div><div><label className="block text-xs font-semibold text-slate-500 mb-1">Perkara</label><select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500"><option value="">Semua Perkara</option>{combinedActivityTypes.map((type, idx) => <option key={idx} value={type}>{type}</option>)}</select></div></div><div className="mt-4 flex justify-between items-center pt-2 border-t border-slate-50"><span className="text-sm text-blue-600 hover:text-blue-800 font-medium">Reset Saringan</span><button onClick={() => { setFilterMonth(''); setFilterStaff(''); setFilterPlace(''); setFilterType(''); }} className="text-sm text-blue-600 hover:text-blue-800 font-medium">Kosongkan Semua</button></div></div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col"><h4 className="font-bold text-slate-800 text-center mb-6 border-b pb-2">Peratus Mengikut Perkara</h4><div className="flex-1 flex items-center justify-center"><ConicPieChart data={getChartData('type')} /></div></div>
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col"><h4 className="font-bold text-slate-800 text-center mb-6 border-b pb-2">Peratus Mengikut Tempat</h4><div className="flex-1 flex items-center justify-center"><ConicPieChart data={getChartData('location')} /></div></div>
@@ -560,14 +675,39 @@
             );
         };
 
-        const AdminLeaderboardTab = ({ logs }) => {
-            const totalEntries = logs.reduce((acc, log) => { acc[log.userName] = (acc[log.userName] || 0) + 1; return acc; }, {});
+        // Tab 4: Leaderboard (DECOUPLED - Own Filter)
+        const AdminLeaderboardTab = ({ logs, allUsers }) => {
+            const [filterMonth, setFilterMonth] = useState('');
+            
+            const filteredLogs = logs.filter(log => {
+                if (!log.date) return false;
+                // Leaderboard typically filters by time period, other filters make less sense for ranking generally, but can be added.
+                // Keeping it simple to Month filter as requested "dynamic leaderboard".
+                return filterMonth ? log.date.startsWith(filterMonth) : true;
+            });
+
+            const totalEntries = filteredLogs.reduce((acc, log) => { acc[log.userName] = (acc[log.userName] || 0) + 1; return acc; }, {});
             const sortedTotal = Object.entries(totalEntries).sort((a, b) => b[1] - a[1]).map(([name, count], i) => ({ rank: i + 1, name, count }));
-            const coachingLogs = logs.filter(log => { const text = (log.type + ' ' + log.catatan).toLowerCase(); return text.includes('bimbingan') || text.includes('coaching') || text.includes('mentoring'); });
+            
+            const coachingLogs = filteredLogs.filter(log => { const text = (log.type + ' ' + log.catatan).toLowerCase(); return text.includes('bimbingan') || text.includes('coaching') || text.includes('mentoring'); });
             const coachingEntries = coachingLogs.reduce((acc, log) => { acc[log.userName] = (acc[log.userName] || 0) + 1; return acc; }, {});
             const sortedCoaching = Object.entries(coachingEntries).sort((a, b) => b[1] - a[1]).map(([name, count], i) => ({ rank: i + 1, name, count }));
+            
             const RankTable = ({ title, data, icon: Icon, color }) => ( <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden h-full"><div className={`p-4 ${color} text-white font-bold flex items-center`}><Icon className="w-5 h-5 mr-2" /> {title}</div><table className="w-full text-sm text-left text-slate-600"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-6 py-3 w-16">#</th><th className="px-6 py-3">Nama Pegawai</th><th className="px-6 py-3 text-right">Jumlah</th></tr></thead><tbody>{data.length > 0 ? data.map((item) => (<tr key={item.name} className="border-b hover:bg-slate-50 last:border-0"><td className="px-6 py-4 font-bold text-slate-400">{item.rank === 1 ? '🥇' : item.rank === 2 ? '🥈' : item.rank === 3 ? '🥉' : item.rank}</td><td className="px-6 py-4 font-medium text-slate-900">{item.name}</td><td className="px-6 py-4 text-right font-bold text-blue-900">{item.count}</td></tr>)) : (<tr><td colSpan="3" className="px-6 py-8 text-center text-slate-400">Tiada data direkodkan.</td></tr>)}</tbody></table></div>);
-            return ( <div className="grid grid-cols-1 md:grid-cols-2 gap-8"><RankTable title="Ranking Pengisian Terbanyak" data={sortedTotal} icon={Icons.Trophy} color="bg-blue-600" /><RankTable title="Ranking Coaching & Mentoring" data={sortedCoaching} icon={Icons.TrendingUp} color="bg-green-600" /></div> );
+            
+            return ( 
+                <div className="space-y-6 fade-in">
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
+                        <h3 className="text-lg font-bold text-slate-800 flex items-center"><Icons.Trophy className="w-5 h-5 mr-2 text-blue-600" /> Leaderboard Dinamik</h3>
+                        <div className="flex items-center space-x-2">
+                            <label className="text-xs font-semibold text-slate-500">Saring Bulan:</label>
+                            <input type="month" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500" />
+                            <button onClick={() => setFilterMonth('')} className="text-sm text-blue-600 hover:text-blue-800 ml-2">Reset</button>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8"><RankTable title="Ranking Pengisian Terbanyak" data={sortedTotal} icon={Icons.Trophy} color="bg-blue-600" /><RankTable title="Ranking Coaching & Mentoring" data={sortedCoaching} icon={Icons.TrendingUp} color="bg-green-600" /></div> 
+                </div>
+            );
         };
 
         const AdminReportTab = ({ logs, allUsers, combinedLocations, combinedActivityTypes }) => {
@@ -610,7 +750,7 @@
             );
         };
 
-        const AdminDashboard = ({ user, logs, data, onAddLocation, onDeleteLocation, onAddActivity, onDeleteActivity, onDeleteUser, onResetUserPassword, allUsers, combinedLocations, combinedActivityTypes }) => {
+        const AdminDashboard = ({ user, logs, data, onAddLocation, onDeleteLocation, onAddActivity, onDeleteActivity, onDeleteUser, onResetUserPassword, onDeleteLog, allUsers, combinedLocations, combinedActivityTypes }) => {
             const [activeTab, setActiveTab] = useState('data');
             return (
                 <div className="p-6 lg:p-10 flex-1">
@@ -625,9 +765,9 @@
                     </div>
                     <div className="min-h-[500px]">
                         {activeTab === 'data' && (<AdminDataManagementTab locations={data.locations} activityTypes={data.activityTypes} users={data.users} logs={logs} onAddLocation={onAddLocation} onDeleteLocation={onDeleteLocation} onAddActivity={onAddActivity} onDeleteActivity={onDeleteActivity} onDeleteUser={onDeleteUser} onResetUserPassword={onResetUserPassword} />)}
-                        {activeTab === 'analisis' && (<AdminAnalysisTab logs={logs} allUsers={allUsers} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} />)}
+                        {activeTab === 'analisis' && (<AdminAnalysisTab logs={logs} allUsers={allUsers} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} onDeleteLog={onDeleteLog} />)}
                         {activeTab === 'stats' && (<AdminStatsTab logs={logs} allUsers={allUsers} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} />)}
-                        {activeTab === 'leaderboard' && <AdminLeaderboardTab logs={logs} />}
+                        {activeTab === 'leaderboard' && <AdminLeaderboardTab logs={logs} allUsers={allUsers} />}
                         {activeTab === 'laporan' && (<AdminReportTab logs={logs} allUsers={allUsers} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} />)}
                     </div>
                 </div>
@@ -701,13 +841,12 @@
                 return () => unsubscribeAuth();
             }, []);
 
-            // --- HEARTBEAT PRESENCE SYSTEM (NEW) ---
+            // --- HEARTBEAT PRESENCE SYSTEM ---
             useEffect(() => {
                 if (!user || !db || !user.id) return;
 
                 const updateHeartbeat = () => {
                     // Check if this is a real Firestore user (has valid ID from DB)
-                    // Don't try to update 'hardcoded' admin if not in DB
                     if (user.id && user.id.length > 5) { 
                          db.collection('egerak_users').doc(user.id).update({
                              lastSeen: firebase.firestore.FieldValue.serverTimestamp()
@@ -723,10 +862,7 @@
 
             // --- AUTH HANDLERS ---
             const handleLogin = (username, password, role) => {
-                // 1. Check State (Firebase Data)
                 let foundUser = users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password);
-                
-                // 2. If not found, check Hardcoded Admin Fallback
                 if (!foundUser && username.toLowerCase() === 'shell' && password === 'shellyap') {
                     foundUser = INITIAL_DATA.users.find(u => u.username === 'shell');
                 }
@@ -745,7 +881,7 @@
                 if (db && !dbError) {
                     db.collection('egerak_users').add({
                         ...newUser,
-                        lastSeen: firebase.firestore.FieldValue.serverTimestamp() // Init lastSeen
+                        lastSeen: firebase.firestore.FieldValue.serverTimestamp() 
                     })
                       .then(() => { setSuccessMsg('Pendaftaran berjaya! Sila log masuk.'); setError(''); })
                       .catch(e => setError("Ralat pendaftaran."));
@@ -762,16 +898,13 @@
             const handleAddLog = (newLogData) => {
                 const newEntry = { userId: user.id, userName: user.name, ...newLogData, createdAt: new Date() };
                 if (db && !dbError) {
-                    // 1. Add the log
                     db.collection('egerak_logs').add(newEntry);
                     
-                    // 2. AUTO-ADD LOCATION to master list if it doesn't exist
                     const existingLoc = locations.find(l => l.name === newLogData.location);
                     if (!existingLoc && newLogData.location) {
                          db.collection('egerak_locations').add({ name: newLogData.location });
                     }
 
-                    // 3. AUTO-ADD ACTIVITY to master list if it doesn't exist
                     const existingType = activityTypes.find(t => t.name === newLogData.type);
                     if (!existingType && newLogData.type) {
                          db.collection('egerak_activities').add({ name: newLogData.type });
@@ -779,10 +912,14 @@
 
                     setShowSuccessModal(true);
                 } else {
-                    // Demo Mode
                     setLogs([{ id: Date.now().toString(), ...newEntry }, ...logs]);
                     setShowSuccessModal(true);
                 }
+            };
+            
+            const handleDeleteLog = (id) => {
+                if (db && !dbError) db.collection('egerak_logs').doc(id).delete();
+                else setLogs(logs.filter(l => l.id !== id));
             };
 
             // Admin Actions
@@ -792,7 +929,6 @@
             const handleDeleteActivity = (id) => { if (db && !dbError) db.collection('egerak_activities').doc(id).delete(); else setActivityTypes(activityTypes.filter(a => a.id !== id)); };
             const handleDeleteUser = (id) => { if (db && !dbError) db.collection('egerak_users').doc(id).delete(); else setUsers(users.filter(u => u.id !== id)); };
             
-            // NEW: Reset Password Handler
             const handleResetUserPassword = (id, newPassword) => {
                 if (db && !dbError) {
                     db.collection('egerak_users').doc(id).update({ password: newPassword })
@@ -846,7 +982,7 @@
                             <AdminDashboard 
                                 user={user} logs={relevantLogs} data={dashboardData}
                                 onAddLocation={handleAddLocation} onDeleteLocation={handleDeleteLocation}
-                                onAddActivity={handleAddActivity} onDeleteActivity={handleDeleteActivity} onDeleteUser={handleDeleteUser} onResetUserPassword={handleResetUserPassword}
+                                onAddActivity={handleAddActivity} onDeleteActivity={handleDeleteActivity} onDeleteUser={handleDeleteUser} onResetUserPassword={handleResetUserPassword} onDeleteLog={handleDeleteLog}
                                 allUsers={allUsers} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes}
                             />
                         )}
