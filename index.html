@@ -34,13 +34,41 @@
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900 select-none">
-    <div id="root"></div>
+    <!-- Loading Indicator (Akan hilang bila React siap loading) -->
+    <div id="root">
+        <div class="flex h-screen items-center justify-center flex-col text-blue-900">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 mb-4"></div>
+            <p class="font-semibold">Memuatkan Aplikasi...</p>
+        </div>
+    </div>
 
     <script type="text/babel">
-        // --- 1. KONFIGURASI ---
-        const LOGO_URL = "https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/Coat_of_arms_of_Malaysia.svg/1200px-Coat_of_arms_of_Malaysia.svg.png"; 
+        // --- 0. PENGENDALIAN RALAT (Supaya tak blank screen) ---
+        window.onerror = function(message, source, lineno, colno, error) {
+            const root = document.getElementById('root');
+            root.innerHTML = `<div style="padding:20px; color:red; text-align:center;">
+                <h3>Ralat Dikesan!</h3>
+                <p>${message}</p>
+                <p style="font-size:12px; color:gray;">Line: ${lineno}</p>
+                <button onclick="location.reload()" style="padding:10px 20px; margin-top:10px; border:1px solid red; background:white;">Muat Semula</button>
+            </div>`;
+        };
+
+        // --- 1. GLOBAL VARIABLES (Hanya isytihar SEKALI sahaja di sini) ---
+        const { useState, useEffect, useMemo, useRef } = React;
+        const CURRENT_YEAR = new Date().getFullYear();
         
-        // *** MASUKKAN FIREBASE CONFIG ANDA DI SINI ***
+        const LOGO_URL = "https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/Coat_of_arms_of_Malaysia.svg/1200px-Coat_of_arms_of_Malaysia.svg.png"; 
+        const LOCATION_CATEGORIES = ['Sekolah Rendah', 'Sekolah Menengah', 'Lain-Lain Tempat'];
+
+        const INITIAL_DATA = {
+            users: [{ id: '1', username: 'shell', password: 'shellyap', role: 'admin', name: 'Shell Yap', department: 'IT' }],
+            logs: [],
+            locations: [], 
+            activityTypes: []
+        };
+
+        // --- 2. FIREBASE CONFIG ---
         const firebaseConfig = {
             apiKey: "AIzaSyBU1n6OAmYxY_SjFuhYkop7C7CrFJja6Do",
             authDomain: "egerak-4f922.firebaseapp.com",
@@ -55,18 +83,8 @@
         const db = firebase.apps.length ? firebase.firestore() : null;
         const auth = firebase.apps.length ? firebase.auth() : null;
 
-        const LOCATION_CATEGORIES = ['Sekolah Rendah', 'Sekolah Menengah', 'Lain-Lain Tempat'];
-        const INITIAL_DATA = {
-            users: [{ id: '1', username: 'shell', password: 'shellyap', role: 'admin', name: 'Shell Yap', department: 'IT' }],
-            logs: [],
-            locations: [], 
-            activityTypes: []
-        };
-
-        const { useState, useEffect, useMemo, useRef } = React;
-
-        // --- ICONS (FIXED SYNTAX) ---
-        // Modified Icon component to accept children instead of just 'd' prop for complex icons
+        // --- 3. ICONS ---
+        // (Syntax Ikon dibaiki supaya menyokong multiple children)
         const Icon = ({ children, className }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
                 {children}
@@ -102,7 +120,7 @@
             UsersIcon: (p) => <Icon {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></Icon>
         };
 
-        // --- UTILS ---
+        // --- 4. UTILS ---
         const formatDate = (ds) => { if(!ds) return '-'; const [y,m,d] = ds.split('-'); return `${d}/${m}/${y.slice(-2)}`; };
         const isUserOnline = (ls) => { if(!ls) return false; const d = ls.toDate ? ls.toDate() : new Date(ls); return d > new Date(Date.now() - 5*60000); };
         
@@ -113,7 +131,7 @@
             const link = document.createElement("a"); link.href = encodeURI(csv); link.download = filename; document.body.appendChild(link); link.click(); document.body.removeChild(link);
         };
 
-        // --- COMPONENTS ---
+        // --- 5. COMPONENTS ---
 
         const SearchableLocationSelect = ({ options, value, onChange, placeholder }) => {
             const [isOpen, setIsOpen] = useState(false);
@@ -157,7 +175,7 @@
                                     {items.map(item => <div key={item} className="px-4 py-2 text-sm text-slate-700 hover:bg-blue-50 cursor-pointer" onClick={() => handleSelect(item)}>{item}</div>)}
                                 </div>
                             ))}
-                            {Object.values(groupedOptions).every(a => a.length === 0) && <div className="px-4 py-3 text-sm text-slate-400 italic text-center">Tiada padanan.</div>}
+                            {Object.values(groupedOptions).every(a => a.length === 0) && <div className="px-4 py-3 text-sm text-slate-400 italic text-center">Tiada padanan. Tekan hantar untuk simpan "{searchTerm}".</div>}
                         </div>
                     )}
                 </div>
@@ -190,7 +208,51 @@
             </Modal>
         );
 
-        // --- AUTH ---
+        const ResetPasswordModal = ({ isOpen, onClose, onConfirm, userName }) => {
+            const [newPassword, setNewPassword] = useState('');
+            if (!isOpen) return null;
+            return (
+                <Modal isOpen={isOpen} onClose={onClose}>
+                    <div className="text-center mb-4">
+                        <h3 className="text-lg font-bold">Reset Kata Laluan</h3>
+                        <p className="text-sm text-gray-500">Untuk pengguna: {userName}</p>
+                    </div>
+                    <input type="text" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full border p-2 rounded mb-4" placeholder="Kata Laluan Baru" />
+                    <div className="flex space-x-3"><button onClick={onClose} className="flex-1 bg-slate-100 py-2 rounded">Batal</button><button onClick={() => { onConfirm(newPassword); setNewPassword(''); }} disabled={!newPassword} className="flex-1 bg-blue-600 text-white py-2 rounded">Simpan</button></div>
+                </Modal>
+            );
+        };
+
+        const ConicPieChart = ({ data, totalLabel = "Rekod" }) => {
+            const total = data.reduce((acc, curr) => acc + curr.value, 0);
+            if (total === 0) return <div className="flex items-center justify-center h-48 text-slate-400 bg-slate-50 rounded-full w-48 mx-auto text-sm">Tiada Data</div>;
+            let currentAngle = 0;
+            const gradientString = data.map(item => {
+                const start = currentAngle;
+                const percentage = (item.value / total) * 100;
+                currentAngle += percentage;
+                return `${item.color} ${start}% ${currentAngle}%`;
+            }).join(', ');
+            return (
+                <div className="flex flex-col items-center">
+                    <div className="w-48 h-48 rounded-full shadow-lg mb-6 relative" style={{ background: `conic-gradient(${gradientString})` }}>
+                        <div className="absolute inset-0 m-auto w-32 h-32 bg-white rounded-full flex items-center justify-center shadow-inner">
+                            <div className="text-center"><span className="text-2xl font-bold text-slate-800 block">{total}</span><span className="text-xs text-slate-500 uppercase tracking-wide">{totalLabel}</span></div>
+                        </div>
+                    </div>
+                    <div className="w-full space-y-2 px-4">
+                        {data.map((item, idx) => (
+                            <div key={idx} className="flex justify-between items-center text-sm border-b border-slate-50 pb-1 last:border-0">
+                                <div className="flex items-center"><span className="w-3 h-3 rounded-full mr-2 shadow-sm" style={{ backgroundColor: item.color }}></span><span className="text-slate-600 truncate max-w-[120px]" title={item.label}>{item.label}</span></div>
+                                <span className="font-semibold text-slate-800">{Math.round((item.value/total)*100)}% <span className="text-slate-400 text-xs font-normal">({item.value})</span></span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- LOGIN ---
         const LoginPage = ({ onLogin, onRegister, loading }) => {
             const [isReg, setIsReg] = useState(false);
             const [data, setData] = useState({ username: '', password: '', fullName: '', department: '' });
@@ -336,6 +398,7 @@
             const [newCat, setNewCat] = useState('Sekolah Rendah');
             const [newAct, setNewAct] = useState('');
             const [deleteItem, setDeleteItem] = useState(null); // { type, id, name }
+            const [resetUser, setResetUser] = useState(null); // User for password reset
 
             const filteredLogs = logs.filter(l => {
                 if (!l.date) return false;
@@ -363,6 +426,24 @@
                         <div className="flex gap-2 mb-4"><input type="text" value={newAct} onChange={e => setNewAct(e.target.value)} className="flex-1 border p-2 rounded" placeholder="Aktiviti"/><button onClick={() => {actions.addActivity(newAct); setNewAct('');}} className="bg-blue-600 text-white px-3 rounded"><Icons.Plus/></button></div>
                         <div className="max-h-60 overflow-y-auto">{types.map(t => <div key={t.id} className="flex justify-between items-center p-2 border-b text-sm"><span>{t.name}</span><button onClick={() => setDeleteItem({type:'act', id:t.id, name:t.name})} className="text-red-500"><Icons.Trash2/></button></div>)}</div>
                     </div>
+                    <div className="col-span-1 md:col-span-2 bg-white p-6 rounded-xl border">
+                        <h3 className="font-bold mb-4">Pengurusan Pengguna</h3>
+                        <div className="max-h-60 overflow-y-auto">
+                            {users.map(u => (
+                                <div key={u.id} className="flex justify-between items-center p-2 border-b text-sm">
+                                    <div>
+                                        <span className="font-bold">{u.name}</span> 
+                                        {isUserOnline(u.lastSeen) && <span className="inline-block w-2 h-2 bg-green-500 rounded-full ml-2"></span>}
+                                        <div className="text-xs text-slate-400">{u.username} | {u.department}</div>
+                                    </div>
+                                    {u.role !== 'admin' && <div className="flex gap-2">
+                                        <button onClick={() => setResetUser(u)} className="text-blue-500"><Icons.Key/></button>
+                                        <button onClick={() => setDeleteItem({type:'user', id:u.id, name:u.name})} className="text-red-500"><Icons.Trash2/></button>
+                                    </div>}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             );
 
@@ -385,22 +466,51 @@
                  </div>
             );
 
+            const renderStatsTab = () => {
+                // Simple Charts based on filteredLogs
+                const getCounts = (k) => filteredLogs.reduce((a,c) => { a[c[k]] = (a[c[k]]||0)+1; return a; }, {});
+                const dataTypes = Object.entries(getCounts('type')).map(([k,v], i) => ({label:k, value:v, color: ['#3b82f6','#10b981','#f59e0b'][i%3]}));
+                
+                return (
+                    <div className="grid md:grid-cols-2 gap-4 fade-in">
+                        <div className="bg-white p-4 rounded-xl border"><h3 className="font-bold text-center mb-4">Statistik Perkara</h3><ConicPieChart data={dataTypes}/></div>
+                        <div className="bg-white p-4 rounded-xl border text-center flex flex-col justify-center"><h3 className="text-4xl font-bold text-blue-900">{filteredLogs.length}</h3><p>Jumlah Rekod</p></div>
+                    </div>
+                );
+            };
+            
+            const renderLeaderboard = () => {
+                const counts = filteredLogs.reduce((a,c) => { a[c.userName] = (a[c.userName]||0)+1; return a; }, {});
+                const sorted = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+                return (
+                    <div className="bg-white rounded-xl border overflow-hidden fade-in">
+                        <div className="p-4 bg-slate-50 font-bold border-b"><Icons.Trophy className="inline w-4 h-4 mr-2"/> Leaderboard</div>
+                        {sorted.map(([name, count], i) => <div key={name} className="p-4 border-b flex justify-between"><span>{i+1}. {name}</span><span className="font-bold">{count}</span></div>)}
+                    </div>
+                )
+            }
+
             return (
                 <div className="p-6 max-w-6xl mx-auto">
                     <h1 className="text-2xl font-bold text-slate-800 mb-6">Admin Dashboard</h1>
                     <div className="flex space-x-4 border-b mb-6 overflow-x-auto">
-                        {['data', 'analisis'].map(t => <button key={t} onClick={() => setTab(t)} className={`pb-2 capitalize font-bold ${tab === t ? 'text-blue-900 border-b-2 border-blue-900' : 'text-slate-400'}`}>{t}</button>)}
+                        {['data', 'analisis', 'statistik', 'leaderboard'].map(t => <button key={t} onClick={() => setTab(t)} className={`pb-2 capitalize font-bold ${tab === t ? 'text-blue-900 border-b-2 border-blue-900' : 'text-slate-400'}`}>{t}</button>)}
                     </div>
                     {tab === 'data' && renderDataTab()}
                     {tab === 'analisis' && renderAnalysisTab()}
+                    {tab === 'statistik' && renderStatsTab()}
+                    {tab === 'leaderboard' && renderLeaderboard()}
                     
-                    <DeleteConfirmationModal isOpen={!!deleteItem} onClose={() => setDeleteItem(null)} onConfirm={() => { 
+                    <DeleteModal isOpen={!!deleteItem} onClose={() => setDeleteItem(null)} onConfirm={() => { 
                         if(deleteItem.type === 'loc') actions.deleteLocation(deleteItem.id);
                         if(deleteItem.type === 'act') actions.deleteActivity(deleteItem.id);
+                        if(deleteItem.type === 'user') actions.deleteUser(deleteItem.id);
                         if(deleteItem.type === 'log') actions.deleteLog(deleteItem.id);
                         setDeleteItem(null); 
-                    }} itemName={deleteItem?.name} />
-                    <BulkDeleteModal isOpen={bulkDeleteOpen} onClose={() => setBulkDeleteOpen(false)} onConfirm={handleBulkDelete} count={filteredLogs.length} />
+                    }} text={`Padam ${deleteItem?.name}?`} />
+                    
+                    <ResetPasswordModal isOpen={!!resetUser} onClose={() => setResetUser(null)} onConfirm={(pw) => actions.resetPassword(resetUser.id, pw)} userName={resetUser?.name} />
+                    <DeleteModal isOpen={bulkDeleteOpen} onClose={() => setBulkDeleteOpen(false)} onConfirm={handleBulkDelete} text={`Padam SEMUA ${filteredLogs.length} rekod ini?`} />
                 </div>
             );
         };
@@ -448,6 +558,8 @@
                 deleteLocation: (id) => db ? db.collection('egerak_locations').doc(id).delete() : setLocations(locations.filter(l => l.id !== id)),
                 addActivity: (name) => db ? db.collection('egerak_activities').add({name}) : setTypes([...types, {id:Date.now(), name}]),
                 deleteActivity: (id) => db ? db.collection('egerak_activities').doc(id).delete() : setTypes(types.filter(t => t.id !== id)),
+                deleteUser: (id) => db ? db.collection('egerak_users').doc(id).delete() : setUsers(users.filter(u => u.id !== id)),
+                resetPassword: (id, pw) => db ? db.collection('egerak_users').doc(id).update({password: pw}).then(() => alert('Password reset')) : alert('Reset demo success')
             };
 
             const handleLogin = (u, p, role) => {
