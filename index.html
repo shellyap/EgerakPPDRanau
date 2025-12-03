@@ -2,38 +2,42 @@
 <html lang="ms">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>E-Gerak PPD Ranau</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Gerak Tracker PPD Ranau (Live Cloud)</title>
     
-    <!-- PWA MANIFEST LINK (Placeholder - requires hosting) -->
-    <link rel="manifest" href="manifest.json">
-    
-    <!-- MOBILE THEME COLORS -->
-    <meta name="theme-color" content="#1e3a8a">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="E-Gerak">
-    
-    <!-- LIBRARIES -->
+    <!-- 1. Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- 3. Babel for JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- FIREBASE COMPAT SDKs -->
+    <!-- 4. Firebase SDKs (Versi Compat) -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 
     <style>
-        @media print { .no-print { display: none !important; } }
-        body { -webkit-tap-highlight-color: transparent; }
-        .fade-in { animation: fadeIn 0.3s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-        /* Hide scrollbar for clean mobile look */
-        .hide-scroll::-webkit-scrollbar { display: none; }
-        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
-        /* Green Dot Pulse Animation (Restored) */
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; }
+            .print-container { box-shadow: none; border: none; }
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .animate-spin { animation: spin 1s linear infinite; }
+        .fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Scrollbar for dropdown */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Green Dot Pulse Animation */
         @keyframes pulse-green {
             0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7); }
             70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(74, 222, 128, 0); }
@@ -46,14 +50,9 @@
             border-radius: 50%;
             animation: pulse-green 2s infinite;
         }
-        /* Custom Scrollbar for Select */
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-900 select-none">
+<body class="bg-slate-50 text-slate-900">
     <div id="root"></div>
 
     <script type="text/babel">
@@ -79,8 +78,6 @@
         const db = firebase.apps.length ? firebase.firestore() : null;
         const auth = firebase.apps.length ? firebase.auth() : null;
 
-        const { useState, useEffect, useMemo, useRef } = React;
-
         // --- 2. DATA LALAI ---
         const CURRENT_YEAR = new Date().getFullYear();
         const INITIAL_DATA = {
@@ -100,7 +97,9 @@
 
         const LOCATION_CATEGORIES = ['Sekolah Rendah', 'Sekolah Menengah', 'Lain-Lain Tempat'];
 
-        // --- 3. ICONS (Full Set Restored) ---
+        // --- 3. ICONS ---
+        const { useState, useEffect, useMemo, useRef } = React;
+
         const IconBase = ({ children, className }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
         );
@@ -136,13 +135,7 @@
             ChevronDown: (p) => <IconBase {...p}><path d="m6 9 6 6 6-6"/></IconBase>
         };
 
-        // --- 4. UTILS (Full Set Restored) ---
-        const isUserOnline = (lastSeen) => {
-            if (!lastSeen) return false;
-            const date = lastSeen.toDate ? lastSeen.toDate() : new Date(lastSeen);
-            const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-            return date > fiveMinutesAgo;
-        };
+        // --- 4. UTILS ---
         const formatDate = (dateString) => {
             if (!dateString) return '-';
             const parts = dateString.split('-');
@@ -150,6 +143,7 @@
             const [year, month, day] = parts;
             return `${day}/${month}/${year.slice(-2)}`;
         };
+
         const downloadCSV = (data, filename) => {
             const headers = ["Tarikh", "Nama", "Tujuan", "Lokasi", "Catatan"];
             const rows = data.map(row => [
@@ -168,120 +162,22 @@
             link.click();
             document.body.removeChild(link);
         };
-
-
-        // --- 5. COMPONENTS (All Full Components Restored) ---
-
-        // (A) Popups/Modals
-        const SuccessModal = ({ isOpen, onClose, message }) => {
-            if (!isOpen) return null;
-            return (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[150] p-4 fade-in">
-                    <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl transform scale-100 transition-transform">
-                        <div className="text-center">
-                            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <Icons.CheckCircle className="w-8 h-8 text-green-600" />
-                            </div>
-                            <h3 className="text-xl font-bold text-slate-800 mb-2">Berjaya!</h3>
-                            <p className="text-slate-600 mb-6">{message}</p>
-                            <button onClick={onClose} className="w-full bg-blue-900 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-800 transition-colors shadow-lg">Tutup</button>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-        const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, itemName }) => {
-            if (!isOpen) return null;
-            return (
-                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[150] p-4 fade-in">
-                    <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl border-2 border-red-50 transform scale-100 transition-all">
-                        <div className="text-center">
-                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
-                                <Icons.AlertCircle className="w-8 h-8 text-red-600" />
-                            </div>
-                            <h3 className="text-xl font-bold text-slate-800 mb-2">Pengesahan Padam</h3>
-                            <p className="text-slate-600 mb-6">Adakah anda pasti mahu memadam <strong>"{itemName}"</strong>?<br/><span className="text-xs text-red-500 font-semibold">Tindakan ini tidak boleh dikembalikan.</span></p>
-                            <div className="flex space-x-3">
-                                <button type="button" onClick={onClose} className="flex-1 bg-slate-100 text-slate-700 py-2.5 rounded-lg font-semibold hover:bg-slate-200 transition-colors">Batal</button>
-                                <button type="button" onClick={onConfirm} className="flex-1 bg-red-600 text-white py-2.5 rounded-lg font-semibold hover:bg-red-700 transition-colors shadow-lg">Ya, Padam</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-        const BulkDeleteModal = ({ isOpen, onClose, onConfirm, count }) => {
-            if (!isOpen) return null;
-            return (
-                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[150] p-4 fade-in">
-                    <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl border-2 border-red-100 transform scale-100 transition-all">
-                        <div className="text-center">
-                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <Icons.Trash2 className="w-8 h-8 text-red-600" />
-                            </div>
-                            <h3 className="text-xl font-bold text-slate-800 mb-2">Kosongkan Rekod</h3>
-                            <p className="text-slate-600 mb-6">Anda akan memadam <strong>{count} rekod</strong> yang terpapar.<br/><span className="text-xs text-red-500 font-semibold">Data ini akan hilang selamanya dari pangkalan data.</span></p>
-                            <div className="flex space-x-3">
-                                <button type="button" onClick={onClose} className="flex-1 bg-slate-100 text-slate-700 py-2.5 rounded-lg font-semibold hover:bg-slate-200 transition-colors">Batal</button>
-                                <button type="button" onClick={onConfirm} className="flex-1 bg-red-600 text-white py-2.5 rounded-lg font-semibold hover:bg-red-700 transition-colors shadow-lg">Ya, Kosongkan</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-        const ResetPasswordModal = ({ isOpen, onClose, onConfirm, userName }) => {
-            const [newPassword, setNewPassword] = useState('');
-            if (!isOpen) return null;
-            return (
-                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[150] p-4 fade-in">
-                    <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl border border-blue-100">
-                        <h3 className="text-lg font-bold text-slate-800 mb-1">Reset Kata Laluan</h3>
-                        <p className="text-sm text-slate-500 mb-4">Tetapkan kata laluan baharu untuk <strong>{userName}</strong>.</p>
-                        <input type="text" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm mb-4" placeholder="Kata Laluan Baru" />
-                        <div className="flex space-x-3">
-                            <button onClick={onClose} className="flex-1 bg-slate-100 text-slate-700 py-2 rounded-lg font-semibold hover:bg-slate-200 transition-colors">Batal</button>
-                            <button onClick={() => { if(newPassword) { onConfirm(newPassword); setNewPassword(''); } }} className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-md" disabled={!newPassword}>Simpan</button>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-        const ConicPieChart = ({ data, totalLabel = "Rekod" }) => {
-            const total = data.reduce((acc, curr) => acc + curr.value, 0);
-            if (total === 0) return <div className="flex items-center justify-center h-48 text-slate-400 bg-slate-50 rounded-full w-48 mx-auto text-sm bg-slate-50">Tiada Data</div>;
-            let currentAngle = 0;
-            const gradientString = data.map(item => {
-                const start = currentAngle;
-                const percentage = (item.value / total) * 100;
-                currentAngle += percentage;
-                return `${item.color} ${start}% ${currentAngle}%`;
-            }).join(', ');
-            return (
-                <div className="flex flex-col items-center">
-                    <div className="w-48 h-48 rounded-full shadow-lg mb-6 relative" style={{ background: `conic-gradient(${gradientString})` }}>
-                        <div className="absolute inset-0 m-auto w-32 h-32 bg-white rounded-full flex items-center justify-center shadow-inner">
-                            <div className="text-center"><span className="text-2xl font-bold text-slate-800 block">{total}</span><span className="text-xs text-slate-500 uppercase tracking-wide">{totalLabel}</span></div>
-                        </div>
-                    </div>
-                    <div className="w-full space-y-2 px-4">
-                        {data.map((item, idx) => (
-                            <div key={idx} className="flex justify-between items-center text-sm border-b border-slate-50 pb-1 last:border-0">
-                                <div className="flex items-center"><span className="w-3 h-3 rounded-full mr-2 shadow-sm" style={{ backgroundColor: item.color }}></span><span className="text-slate-600 truncate max-w-[120px]" title={item.label}>{item.label}</span></div>
-                                <span className="font-semibold text-slate-800">{Math.round((item.value/total)*100)}% <span className="text-slate-400 text-xs font-normal">({item.value})</span></span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            );
-        };
         
-        // (B) Searchable Location Select
+        const isUserOnline = (lastSeen) => {
+            if (!lastSeen) return false;
+            const date = lastSeen.toDate ? lastSeen.toDate() : new Date(lastSeen);
+            const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+            return date > fiveMinutesAgo;
+        };
+
+        // --- 5. COMPONENTS ---
+        // NEW COMPONENT: SEARCHABLE LOCATION SELECT WITH GROUPING
         const SearchableLocationSelect = ({ options, value, onChange, placeholder }) => {
             const [isOpen, setIsOpen] = useState(false);
             const [searchTerm, setSearchTerm] = useState('');
             const wrapperRef = useRef(null);
 
+            // Close on click outside
             useEffect(() => {
                 function handleClickOutside(event) {
                     if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
@@ -292,6 +188,7 @@
                 return () => document.removeEventListener("mousedown", handleClickOutside);
             }, [wrapperRef]);
 
+            // Update search term when value changes externally or initially
             useEffect(() => {
                 setSearchTerm(value || '');
             }, [value]);
@@ -304,6 +201,7 @@
                 };
 
                 options.forEach(opt => {
+                    // Handle both object {name, category} and simple string (legacy)
                     const name = opt.name || opt;
                     const category = opt.category || 'Lain-Lain Tempat';
                     
@@ -370,8 +268,130 @@
                 </div>
             );
         };
+
+        const SuccessModal = ({ isOpen, onClose, message }) => {
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[150] p-4 fade-in">
+                    <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl transform scale-100 transition-transform">
+                        <div className="text-center">
+                            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Icons.CheckCircle className="w-8 h-8 text-green-600" />
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-800 mb-2">Berjaya!</h3>
+                            <p className="text-slate-600 mb-6">{message}</p>
+                            <button onClick={onClose} className="w-full bg-blue-900 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-800 transition-colors shadow-lg">Tutup</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, itemName }) => {
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[150] p-4 fade-in">
+                    <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl border-2 border-red-50 transform scale-100 transition-all">
+                        <div className="text-center">
+                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+                                <Icons.AlertCircle className="w-8 h-8 text-red-600" />
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-800 mb-2">Pengesahan Padam</h3>
+                            <p className="text-slate-600 mb-6">Adakah anda pasti mahu memadam <strong>"{itemName}"</strong>?<br/><span className="text-xs text-red-500 font-semibold">Tindakan ini tidak boleh dikembalikan.</span></p>
+                            <div className="flex space-x-3">
+                                <button type="button" onClick={onClose} className="flex-1 bg-slate-100 text-slate-700 py-2.5 rounded-lg font-semibold hover:bg-slate-200 transition-colors">Batal</button>
+                                <button type="button" onClick={onConfirm} className="flex-1 bg-red-600 text-white py-2.5 rounded-lg font-semibold hover:bg-red-700 transition-colors shadow-lg">Ya, Padam</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const BulkDeleteModal = ({ isOpen, onClose, onConfirm, count }) => {
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[150] p-4 fade-in">
+                    <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl border-2 border-red-100 transform scale-100 transition-all">
+                        <div className="text-center">
+                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Icons.Trash2 className="w-8 h-8 text-red-600" />
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-800 mb-2">Kosongkan Rekod</h3>
+                            <p className="text-slate-600 mb-6">Anda akan memadam <strong>{count} rekod</strong> yang terpapar.<br/><span className="text-xs text-red-500 font-semibold">Data ini akan hilang selamanya dari pangkalan data.</span></p>
+                            <div className="flex space-x-3">
+                                <button type="button" onClick={onClose} className="flex-1 bg-slate-100 text-slate-700 py-2.5 rounded-lg font-semibold hover:bg-slate-200 transition-colors">Batal</button>
+                                <button type="button" onClick={onConfirm} className="flex-1 bg-red-600 text-white py-2.5 rounded-lg font-semibold hover:bg-red-700 transition-colors shadow-lg">Ya, Kosongkan</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const ResetPasswordModal = ({ isOpen, onClose, onConfirm, userName }) => {
+            const [newPassword, setNewPassword] = useState('');
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[150] p-4 fade-in">
+                    <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl border border-blue-100">
+                        <h3 className="text-lg font-bold text-slate-800 mb-1">Reset Kata Laluan</h3>
+                        <p className="text-sm text-slate-500 mb-4">Tetapkan kata laluan baharu untuk <strong>{userName}</strong>.</p>
+                        <input type="text" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm mb-4" placeholder="Kata Laluan Baru" />
+                        <div className="flex space-x-3">
+                            <button onClick={onClose} className="flex-1 bg-slate-100 text-slate-700 py-2 rounded-lg font-semibold hover:bg-slate-200 transition-colors">Batal</button>
+                            <button onClick={() => { if(newPassword) { onConfirm(newPassword); setNewPassword(''); } }} className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-md" disabled={!newPassword}>Simpan</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
         
-        // (C) Login Page (Full Restoration)
+        const PermissionErrorBanner = ({ show }) => {
+            if (!show) return null;
+            return (
+                <div className="fixed top-0 left-0 right-0 bg-red-600 text-white p-4 text-center shadow-lg z-[200] animate-bounce">
+                    <div className="max-w-4xl mx-auto flex items-center justify-center gap-3">
+                        <Icons.AlertTriangle className="w-6 h-6 text-white" />
+                        <div>
+                            <p className="font-bold">Ralat Kebenaran Database</p>
+                            <p className="text-sm opacity-90">Sila semak Firestore Rules di Firebase Console.</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const ConicPieChart = ({ data, totalLabel = "Rekod" }) => {
+            const total = data.reduce((acc, curr) => acc + curr.value, 0);
+            if (total === 0) return <div className="flex items-center justify-center h-48 text-slate-400 bg-slate-50 rounded-full w-48 mx-auto text-sm bg-slate-50">Tiada Data</div>;
+            let currentAngle = 0;
+            const gradientString = data.map(item => {
+                const start = currentAngle;
+                const percentage = (item.value / total) * 100;
+                currentAngle += percentage;
+                return `${item.color} ${start}% ${currentAngle}%`;
+            }).join(', ');
+            return (
+                <div className="flex flex-col items-center">
+                    <div className="w-48 h-48 rounded-full shadow-lg mb-6 relative" style={{ background: `conic-gradient(${gradientString})` }}>
+                        <div className="absolute inset-0 m-auto w-32 h-32 bg-white rounded-full flex items-center justify-center shadow-inner">
+                            <div className="text-center"><span className="text-2xl font-bold text-slate-800 block">{total}</span><span className="text-xs text-slate-500 uppercase tracking-wide">{totalLabel}</span></div>
+                        </div>
+                    </div>
+                    <div className="w-full space-y-2 px-4">
+                        {data.map((item, idx) => (
+                            <div key={idx} className="flex justify-between items-center text-sm border-b border-slate-50 pb-1 last:border-0">
+                                <div className="flex items-center"><span className="w-3 h-3 rounded-full mr-2 shadow-sm" style={{ backgroundColor: item.color }}></span><span className="text-slate-600 truncate max-w-[120px]" title={item.label}>{item.label}</span></div>
+                                <span className="font-semibold text-slate-800">{Math.round((item.value/total)*100)}% <span className="text-slate-400 text-xs font-normal">({item.value})</span></span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- LOGIN ---
         const LoginPage = ({ onLogin, onRegister, error, usersLoading }) => {
             const [isRegistering, setIsRegistering] = useState(false);
             const [roleTab, setRoleTab] = useState('staff');
@@ -383,13 +403,7 @@
             const handleSubmit = (e) => {
                 e.preventDefault();
                 if (usersLoading) return;
-                // Since this environment doesn't allow Firestore write/auth fully, we alert on register for demo
-                if (isRegistering) { 
-                    onRegister({ username, password, name: fullName, department, role: 'staff' }); 
-                    setIsRegistering(false); 
-                    setUsername(''); 
-                    setPassword(''); 
-                } 
+                if (isRegistering) { onRegister({ username, password, name: fullName, department, role: 'staff' }); setIsRegistering(false); setUsername(''); setPassword(''); } 
                 else { onLogin(username, password, roleTab); }
             };
 
@@ -436,14 +450,15 @@
                 </div>
             );
         };
-        
-        // (D) Staff Dashboard Tabs (Full Restoration)
+
+        // --- STAFF ---
         const StaffEntryTab = ({ onSubmit, availableLocations, availableTypes }) => {
             const [formData, setFormData] = useState({ date: new Date().toISOString().split('T')[0], location: '', type: '', catatan: '', category: 'Sekolah Rendah' });
             const [useCustomType, setUseCustomType] = useState(false);
             const [isManualLocation, setIsManualLocation] = useState(false);
             const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
+            // Filter locations based on selected category
             const filteredLocations = useMemo(() => {
                 return availableLocations.filter(loc => {
                     const cat = loc.category || 'Lain-Lain Tempat';
@@ -578,7 +593,8 @@
             );
         };
 
-        // (E) Admin Dashboard Tabs (Full Restoration)
+        // --- ADMIN DASHBOARD (UPDATED) ---
+        // Tab 1: Pengurusan Data & Pengguna
         const AdminDataManagementTab = ({ 
             locations, activityTypes, users, logs,
             onAddLocation, onDeleteLocation, 
@@ -592,7 +608,7 @@
             const [userToReset, setUserToReset] = useState(null);
 
             const triggerDelete = (type, id, name) => setItemToDelete({ type, id, name });
-            const confirmDelete = () => { if (!itemToDelete) return; const { type, id } = itemToDelete; if (type === 'location') alert(`Simulated Delete: Location ${id}`); if (type === 'activity') alert(`Simulated Delete: Activity ${id}`); if (type === 'user') alert(`Simulated Delete: User ${id}`); setItemToDelete(null); }; // Placeholder actions
+            const confirmDelete = () => { if (!itemToDelete) return; const { type, id } = itemToDelete; if (type === 'location') onDeleteLocation(id); if (type === 'activity') onDeleteActivity(id); if (type === 'user') onDeleteUser(id); setItemToDelete(null); };
 
             const sortedUsers = [...users].sort((a, b) => a.name.localeCompare(b.name));
             const nameCounts = sortedUsers.reduce((acc, user) => { acc[user.name] = (acc[user.name] || 0) + 1; return acc; }, {});
@@ -640,6 +656,7 @@
                             </div>
                         </div>
                     </div>
+
                     {/* SECTION 2: ONLINE USERS */}
                     <div>
                         <h2 className="text-xl font-bold text-slate-800 mb-4 border-b pb-2">Seksyen 2: Pengguna Sedang Online</h2>
@@ -661,6 +678,7 @@
                              )}
                         </div>
                     </div>
+
                     {/* SECTION 3: REGISTERED USERS */}
                     <div>
                         <h2 className="text-xl font-bold text-slate-800 mb-4 border-b pb-2">Seksyen 3: Pengurusan Pengguna Berdaftar</h2>
@@ -693,10 +711,12 @@
                     </div>
                     
                     <DeleteConfirmationModal isOpen={!!itemToDelete} onClose={() => setItemToDelete(null)} onConfirm={confirmDelete} itemName={itemToDelete?.name} />
-                    <ResetPasswordModal isOpen={!!userToReset} onClose={() => setUserToReset(null)} onConfirm={(newPw) => { alert(`Simulated Reset Password for ${userToReset.name}`); setUserToReset(null); }} userName={userToReset?.name} />
+                    <ResetPasswordModal isOpen={!!userToReset} onClose={() => setUserToReset(null)} onConfirm={(newPw) => { onResetUserPassword(userToReset.id, newPw); setUserToReset(null); }} userName={userToReset?.name} />
                 </div>
             );
         };
+
+        // Tab 2: Analisis & Rekod
         const AdminAnalysisTab = ({ logs, allUsers, combinedLocations, combinedActivityTypes, onDeleteLog }) => {
             const [filterMonth, setFilterMonth] = useState('');
             const [filterStaff, setFilterStaff] = useState('');
@@ -715,12 +735,12 @@
             });
 
             const handleBulkDelete = () => {
-                alert(`Simulated Bulk Delete: Deleting ${filteredLogs.length} records.`);
+                filteredLogs.forEach(log => onDeleteLog(log.id));
                 setShowBulkDeleteConfirm(false);
             };
 
             const confirmSingleDelete = () => {
-                if (recordToDelete) { alert(`Simulated Delete: Record ${recordToDelete}`); setRecordToDelete(null); }
+                if (recordToDelete) { onDeleteLog(recordToDelete); setRecordToDelete(null); }
             };
 
             return (
@@ -768,6 +788,7 @@
                 </div>
             );
         };
+
         const AdminStatsTab = ({ logs, allUsers, combinedLocations, combinedActivityTypes }) => {
             const [filterMonth, setFilterMonth] = useState(''); const [filterStaff, setFilterStaff] = useState(''); const [filterPlace, setFilterPlace] = useState(''); const [filterType, setFilterType] = useState('');
             const filteredLogs = logs.filter(log => { if (!log.date) return false; const matchMonth = filterMonth ? log.date.startsWith(filterMonth) : true; const matchStaff = filterStaff ? log.userName === filterStaff : true; const matchPlace = filterPlace ? log.location === filterPlace : true; const matchType = filterType ? log.type === filterType : true; return matchMonth && matchStaff && matchPlace && matchType; });
@@ -784,6 +805,7 @@
                 </div>
             );
         };
+
         const AdminLeaderboardTab = ({ logs }) => {
             const [filterMonth, setFilterMonth] = useState('');
             const filteredLogs = logs.filter(log => { if (!log.date) return false; return filterMonth ? log.date.startsWith(filterMonth) : true; });
@@ -795,6 +817,7 @@
             const RankTable = ({ title, data, icon: Icon, color }) => ( <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden h-full"><div className={`p-4 ${color} text-white font-bold flex items-center`}><Icon className="w-5 h-5 mr-2" /> {title}</div><table className="w-full text-sm text-left text-slate-600"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-6 py-3 w-16">#</th><th className="px-6 py-3">Nama Pegawai</th><th className="px-6 py-3 text-right">Jumlah</th></tr></thead><tbody>{data.length > 0 ? data.map((item) => (<tr key={item.name} className="border-b hover:bg-slate-50 last:border-0"><td className="px-6 py-4 font-bold text-slate-400">{item.rank === 1 ? '🥇' : item.rank === 2 ? '🥈' : item.rank === 3 ? '🥉' : item.rank}</td><td className="px-6 py-4 font-medium text-slate-900">{item.name}</td><td className="px-6 py-4 text-right font-bold text-blue-900">{item.count}</td></tr>)) : (<tr><td colSpan="3" className="px-6 py-8 text-center text-slate-400">Tiada data direkodkan.</td></tr>)}</tbody></table></div>);
             return ( <div className="space-y-6 fade-in"><div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between"><h3 className="text-lg font-bold text-slate-800 flex items-center"><Icons.Trophy className="w-5 h-5 mr-2 text-blue-600" /> Leaderboard Dinamik</h3><div className="flex items-center space-x-2"><label className="text-xs font-semibold text-slate-500">Saring Bulan:</label><input type="month" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500" /><button onClick={() => setFilterMonth('')} className="text-sm text-blue-600 hover:text-blue-800 ml-2">Reset</button></div></div><div className="grid grid-cols-1 md:grid-cols-2 gap-8"><RankTable title="Ranking Pengisian Terbanyak" data={sortedTotal} icon={Icons.Trophy} color="bg-blue-600" /><RankTable title="Ranking Coaching & Mentoring" data={sortedCoaching} icon={Icons.TrendingUp} color="bg-green-600" /></div></div> );
         };
+
         const AdminReportTab = ({ logs, allUsers, combinedLocations, combinedActivityTypes }) => {
             const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
             const [filterStaff, setFilterStaff] = useState(''); 
@@ -835,18 +858,8 @@
             );
         };
 
-        const AdminDashboard = ({ user, logs, data, allUsers, combinedLocations, combinedActivityTypes }) => {
+        const AdminDashboard = ({ user, logs, data, onAddLocation, onDeleteLocation, onAddActivity, onDeleteActivity, onDeleteUser, onResetUserPassword, onDeleteLog, allUsers, combinedLocations, combinedActivityTypes }) => {
             const [activeTab, setActiveTab] = useState('data');
-            // Simplified handlers for demo
-            const onAddLocation = (name, category) => alert(`Simulated Add Location: ${name} (${category})`);
-            const onDeleteLocation = (id) => alert(`Simulated Delete Location: ${id}`);
-            const onAddActivity = (name) => alert(`Simulated Add Activity: ${name}`);
-            const onDeleteActivity = (id) => alert(`Simulated Delete Activity: ${id}`);
-            const onDeleteUser = (id) => alert(`Simulated Delete User: ${id}`);
-            const onResetUserPassword = (id, newPw) => alert(`Simulated Reset Password for User: ${id}`);
-            const onDeleteLog = (id) => alert(`Simulated Delete Log: ${id}`);
-
-
             return (
                 <div className="p-6 lg:p-10 flex-1">
                     <h1 className="text-2xl font-bold text-slate-800 mb-2">Paparan Utama Admin</h1>
@@ -869,125 +882,228 @@
             );
         };
 
-
-        // --- MAIN APP COMPONENT ---
+        // --- APP UTAMA ---
         const App = () => {
+            // STATE UTAMA
             const [user, setUser] = useState(null);
             const [error, setError] = useState('');
+            const [successMsg, setSuccessMsg] = useState('');
+            const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+            const [showSuccessModal, setShowSuccessModal] = useState(false);
+            const [dbError, setDbError] = useState(false);
             const [usersLoading, setUsersLoading] = useState(true);
-            const [users, setUsers] = useState(INITIAL_DATA.users); 
+            
+            // STATE DATA (Default to INITIAL_DATA immediately)
+            const [users, setUsers] = useState(INITIAL_DATA.users);
             const [logs, setLogs] = useState(INITIAL_DATA.logs);
             const [locations, setLocations] = useState(INITIAL_DATA.locations);
             const [activityTypes, setActivityTypes] = useState(INITIAL_DATA.activityTypes);
-            const [showSuccessModal, setShowSuccessModal] = useState(false);
-            
-            // --- FIREBASE/AUTH/LOADING SIMULATION ---
+
+            // --- FIREBASE SYNC ---
             useEffect(() => {
-                // Simulating initialization and anonymous sign-in
-                auth.signInAnonymously().then(() => setUsersLoading(false)).catch(() => setUsersLoading(false));
-                
-                // Simulating user data loading complete
-                setTimeout(() => setUsersLoading(false), 500); 
+                if (!db) {
+                    setUsersLoading(false);
+                    return;
+                }
+
+                // 1. Wait for Auth State
+                const unsubscribeAuth = auth.onAuthStateChanged((currentUser) => {
+                     if (currentUser) {
+                        // User is signed in, now attach listeners
+                        const unsubUsers = db.collection('egerak_users').onSnapshot(snap => {
+                            const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                            if (list.length > 0) setUsers(list);
+                            setUsersLoading(false);
+                        }, err => {
+                            console.error("DB Error:", err);
+                            if (err.code === 'permission-denied') setDbError(true);
+                            setUsersLoading(false); 
+                        });
+
+                        const unsubLogs = db.collection('egerak_logs').orderBy('date', 'desc').onSnapshot(snap => {
+                            const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                            if (list.length > 0) setLogs(list);
+                        }, err => { if (err.code === 'permission-denied') setDbError(true); });
+
+                        const unsubLoc = db.collection('egerak_locations').onSnapshot(snap => {
+                            const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                            if (list.length > 0) setLocations(list);
+                        }, err => {});
+
+                        const unsubAct = db.collection('egerak_activities').onSnapshot(snap => {
+                            const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                            if (list.length > 0) setActivityTypes(list);
+                        }, err => {});
+
+                        // Cleanup function for listeners when component unmounts or auth changes
+                        return () => { unsubUsers(); unsubLogs(); unsubLoc(); unsubAct(); };
+                     } else {
+                        // No user, sign in anonymously first
+                        auth.signInAnonymously().catch(e => {
+                            console.error("Auth Error", e);
+                            setUsersLoading(false);
+                        });
+                     }
+                });
+
+                return () => unsubscribeAuth();
             }, []);
 
-            // --- COMPUTED DATA (Must match original logic) ---
+            // --- HEARTBEAT PRESENCE SYSTEM ---
+            useEffect(() => {
+                if (!user || !db || !user.id) return;
+
+                const updateHeartbeat = () => {
+                    // Check if this is a real Firestore user (has valid ID from DB)
+                    if (user.id && user.id.length > 5) { 
+                         db.collection('egerak_users').doc(user.id).update({
+                             lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+                         }).catch(err => console.log("Heartbeat skipped (likely admin/demo user)"));
+                    }
+                };
+
+                updateHeartbeat(); // Update immediately on login
+                const interval = setInterval(updateHeartbeat, 60000); // Update every 60s
+
+                return () => clearInterval(interval);
+            }, [user]);
+
+            // --- AUTH HANDLERS ---
+            const handleLogin = (username, password, role) => {
+                let foundUser = users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password);
+                if (!foundUser && username.toLowerCase() === 'shell' && password === 'shellyap') {
+                    foundUser = INITIAL_DATA.users.find(u => u.username === 'shell');
+                }
+
+                if (foundUser) { 
+                    setUser(foundUser); 
+                    setError(''); 
+                    setSuccessMsg(''); 
+                } else { 
+                    setError('ID Pengguna atau Kata Laluan tidak sah.'); 
+                    setSuccessMsg(''); 
+                }
+            };
+
+            const handleRegister = (newUser) => {
+                if (db && !dbError) {
+                    db.collection('egerak_users').add({
+                        ...newUser,
+                        lastSeen: firebase.firestore.FieldValue.serverTimestamp() 
+                    })
+                      .then(() => { setSuccessMsg('Pendaftaran berjaya! Sila log masuk.'); setError(''); })
+                      .catch(e => setError("Ralat pendaftaran."));
+                } else {
+                    const id = (users.length + 1).toString();
+                    setUsers([...users, { ...newUser, id }]);
+                    setSuccessMsg('Pendaftaran berjaya (Mod Demo)!');
+                }
+            };
+
+            const handleLogout = () => { setUser(null); setIsMobileMenuOpen(false); setSuccessMsg(''); setError(''); };
+
+            // --- DATA HANDLERS ---
+            const handleAddLog = (newLogData) => {
+                const newEntry = { userId: user.id, userName: user.name, ...newLogData, createdAt: new Date() };
+                if (db && !dbError) {
+                    db.collection('egerak_logs').add(newEntry);
+                    
+                    const existingLoc = locations.find(l => l.name === newLogData.location);
+                    if (!existingLoc && newLogData.location) {
+                         db.collection('egerak_locations').add({ 
+                             name: newLogData.location,
+                             category: newLogData.category || 'Lain-Lain Tempat'
+                        });
+                    }
+
+                    const existingType = activityTypes.find(t => t.name === newLogData.type);
+                    if (!existingType && newLogData.type) {
+                         db.collection('egerak_activities').add({ name: newLogData.type });
+                    }
+
+                    setShowSuccessModal(true);
+                } else {
+                    setLogs([{ id: Date.now().toString(), ...newEntry }, ...logs]);
+                    setShowSuccessModal(true);
+                }
+            };
+            
+            const handleDeleteLog = (id) => {
+                if (db && !dbError) db.collection('egerak_logs').doc(id).delete();
+                else setLogs(logs.filter(l => l.id !== id));
+            };
+
+            // Admin Actions
+            const handleAddLocation = (name, category) => { if (db && !dbError) db.collection('egerak_locations').add({ name, category }); else setLocations([...locations, { id: Date.now().toString(), name, category }]); };
+            const handleDeleteLocation = (id) => { if (db && !dbError) db.collection('egerak_locations').doc(id).delete(); else setLocations(locations.filter(l => l.id !== id)); };
+            const handleAddActivity = (name) => { if (db && !dbError) db.collection('egerak_activities').add({ name }); else setActivityTypes([...activityTypes, { id: Date.now().toString(), name }]); };
+            const handleDeleteActivity = (id) => { if (db && !dbError) db.collection('egerak_activities').doc(id).delete(); else setActivityTypes(activityTypes.filter(a => a.id !== id)); };
+            const handleDeleteUser = (id) => { if (db && !dbError) db.collection('egerak_users').doc(id).delete(); else setUsers(users.filter(u => u.id !== id)); };
+            
+            const handleResetUserPassword = (id, newPassword) => {
+                if (db && !dbError) {
+                    db.collection('egerak_users').doc(id).update({ password: newPassword })
+                      .then(() => alert("Kata laluan berjaya dikemaskini."))
+                      .catch(e => alert("Gagal mengemaskini kata laluan."));
+                } else {
+                    setUsers(users.map(u => u.id === id ? { ...u, password: newPassword } : u));
+                    alert("Kata laluan berjaya dikemaskini (Mod Demo).");
+                }
+            };
+
+            // --- COMPUTED DATA ---
             const combinedLocations = useMemo(() => {
+                // Merge master list and logged locations. 
+                // Prefer master list objects to keep categories.
                 const masterMap = new Map(locations.map(l => [l.name, l]));
-                logs.forEach(l => { if (l.location && !masterMap.has(l.location)) { masterMap.set(l.location, { name: l.location, category: 'Lain-Lain Tempat' }); } });
+                
+                // Add any locations from logs that aren't in master list (assign default category)
+                logs.forEach(l => {
+                    if (l.location && !masterMap.has(l.location)) {
+                        masterMap.set(l.location, { name: l.location, category: 'Lain-Lain Tempat' });
+                    }
+                });
+
                 return Array.from(masterMap.values()).sort((a,b) => a.name.localeCompare(b.name));
             }, [logs, locations]);
+
             const combinedActivityTypes = useMemo(() => {
                 const logTypes = logs.map(l => l.type).filter(Boolean);
                 const masterTypes = activityTypes.map(l => l.name || l);
                 return Array.from(new Set([...masterTypes, ...logTypes])).sort();
             }, [logs, activityTypes]);
+
             const allUsers = useMemo(() => {
                 const logUserNames = logs.map(l => l.userName);
                 const registeredUserNames = users.map(u => u.name);
                 return Array.from(new Set([...registeredUserNames, ...logUserNames])).sort();
             }, [logs, users]);
 
-
-            // --- AUTH/DATA HANDLERS ---
-            const handleLogin = (username, password, role) => {
-                let foundUser = users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password && u.role === role);
-                
-                if (foundUser) { 
-                    setUser(foundUser); 
-                    setError(''); 
-                } else { 
-                    setError('ID Pengguna atau Kata Laluan tidak sah.'); 
-                }
-            };
-            const handleRegister = (newUser) => {
-                const id = (users.length + 1).toString();
-                setUsers([...users, { ...newUser, id }]);
-                alert('Pendaftaran berjaya (Mod Demo)! Sila log masuk.');
-            };
-
-            const handleLogout = () => { 
-                setUser(null); 
-                setError('');
-                auth.signOut().catch(() => {});
-            };
-
-            const handleAddLog = (newLogData) => {
-                const newEntry = { id: Date.now().toString(), userId: user.id || 'temp', userName: user.name, date: newLogData.date, location: newLogData.location, type: newLogData.type, catatan: newLogData.catatan, createdAt: new Date() };
-                setLogs([newEntry, ...logs]);
-                setShowSuccessModal(true);
-            };
-
             const relevantLogs = user ? (user.role === 'admin' ? logs : logs.filter(log => log.userId === user.id)) : [];
             const dashboardData = { users, logs, locations, activityTypes };
 
-
-            if (usersLoading) return <div className="h-screen flex items-center justify-center text-blue-900"><Icons.RefreshCw className="animate-spin w-8 h-8"/></div>;
-
-            if (!user) {
-                return <LoginPage onLogin={handleLogin} onRegister={handleRegister} error={error} usersLoading={usersLoading} />;
-            }
+            if (!user) return (
+                <>
+                    <PermissionErrorBanner show={dbError} />
+                    <LoginPage onLogin={handleLogin} onRegister={handleRegister} error={error} setError={setError} usersLoading={usersLoading} />
+                </>
+            );
 
             return (
                 <div className="min-h-screen bg-slate-50 flex font-sans">
-                    <aside className="hidden md:flex flex-col w-64 bg-blue-900 text-white fixed h-full z-10 print:hidden">
-                        <div className="p-6 flex items-center space-x-3 border-b border-blue-800">
-                            <div className="bg-white p-1 rounded-full"><Icons.MapPin className="w-6 h-6 text-blue-900" /></div>
-                            <span className="font-bold text-lg tracking-wide">E-Gerak</span>
-                        </div>
-                        <div className="flex-1 p-4">
-                            <div className="p-4 bg-blue-800 rounded-xl mb-4">
-                                <p className="text-xs text-blue-300 uppercase tracking-wider mb-1">Akaun</p>
-                                <p className="font-bold truncate">{user.name}</p>
-                                <p className="text-xs text-blue-200">{user.role === 'admin' ? 'Pentadbir Sistem' : 'Pegawai / Staf'}</p>
-                            </div>
-                        </div>
-                        <div className="p-4 border-t border-blue-800">
-                            <button onClick={handleLogout} className="flex items-center space-x-2 text-sm text-blue-200 hover:text-white w-full px-2 py-2 rounded-lg hover:bg-blue-800 transition-colors">
-                                <Icons.Lock className="w-4 h-4" /><span>Log Keluar</span>
-                            </button>
-                        </div>
-                    </aside>
+                    <PermissionErrorBanner show={dbError} />
+                    <aside className="hidden md:flex flex-col w-64 bg-blue-900 text-white fixed h-full z-10 print:hidden"><div className="p-6 flex items-center space-x-3 border-b border-blue-800"><div className="bg-white p-1 rounded-full"><Icons.MapPin className="w-6 h-6 text-blue-900" /></div><span className="font-bold text-lg tracking-wide">E-Gerak</span></div><div className="flex-1 p-4"><div className="p-4 bg-blue-800 rounded-xl mb-4"><p className="text-xs text-blue-300 uppercase tracking-wider mb-1">Akaun</p><p className="font-bold truncate">{user.name}</p><p className="text-xs text-blue-200">{user.role === 'admin' ? 'Pentadbir Sistem' : 'Pegawai / Staf'}</p></div></div><div className="p-4 border-t border-blue-800"><button onClick={handleLogout} className="flex items-center space-x-2 text-sm text-blue-200 hover:text-white w-full px-2 py-2 rounded-lg hover:bg-blue-800 transition-colors"><Icons.LogOut className="w-4 h-4" /><span>Log Keluar</span></button></div></aside>
                     <main className="flex-1 md:ml-64 flex flex-col min-h-screen">
-                         <header className="bg-white shadow-sm sticky top-0 z-20 md:hidden px-4 py-3 flex justify-between items-center print:hidden">
-                            <div className="flex items-center space-x-2"><Icons.MapPin className="text-blue-900 w-6 h-6" /><span className="font-bold text-blue-900">E-Gerak</span></div>
-                            <button onClick={handleLogout} className="text-red-500 text-sm font-semibold">Log Keluar</button>
-                         </header>
-                         {user.role === 'staff' ? (
-                            <StaffDashboard 
-                                user={user} 
-                                logs={relevantLogs} 
-                                onAddLog={handleAddLog} 
-                                combinedLocations={combinedLocations} 
-                                combinedActivityTypes={combinedActivityTypes} 
-                            />
+                        <header className="bg-white shadow-sm sticky top-0 z-20 md:hidden px-4 py-3 flex justify-between items-center print:hidden"><div className="flex items-center space-x-2"><Icons.MapPin className="text-blue-900 w-6 h-6" /><span className="font-bold text-blue-900">E-Gerak</span></div><button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>{isMobileMenuOpen ? <Icons.X className="text-slate-600" /> : <Icons.Menu className="text-slate-600" />}</button></header>
+                        {isMobileMenuOpen && (<div className="md:hidden bg-blue-900 text-white p-4 space-y-3 absolute top-14 w-full z-20 shadow-xl print:hidden"><div className="pb-3 border-b border-blue-700 mb-3"><p className="font-bold">{user.name}</p><p className="text-xs text-blue-300">{user.department}</p></div><button onClick={handleLogout} className="block w-full text-left py-2 text-red-300">Log Keluar</button></div>)}
+                        {user.role === 'staff' ? (
+                            <StaffDashboard user={user} logs={relevantLogs} onAddLog={handleAddLog} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} />
                         ) : (
                             <AdminDashboard 
-                                user={user} 
-                                logs={logs} 
-                                data={dashboardData}
-                                allUsers={allUsers} 
-                                combinedLocations={combinedLocations} 
-                                combinedActivityTypes={combinedActivityTypes}
+                                user={user} logs={relevantLogs} data={dashboardData}
+                                onAddLocation={handleAddLocation} onDeleteLocation={handleDeleteLocation}
+                                onAddActivity={handleAddActivity} onDeleteActivity={handleDeleteActivity} onDeleteUser={handleDeleteUser} onResetUserPassword={handleResetUserPassword} onDeleteLog={handleDeleteLog}
+                                allUsers={allUsers} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes}
                             />
                         )}
                     </main>
