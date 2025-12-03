@@ -15,7 +15,7 @@
     <!-- 3. Babel for JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- 4. Firebase SDKs (Versi Compat - Paling stabil untuk single file HTML) -->
+    <!-- 4. Firebase SDKs (Versi Compat) -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -47,11 +47,10 @@
             measurementId: "G-V6CGGJ81JG"
         };
 
-        // Inisialisasi Firebase (Hanya sekali)
+        // Inisialisasi Firebase
         if (!firebase.apps.length) {
             try {
                 firebase.initializeApp(firebaseConfig);
-                console.log("Firebase berjaya disambungkan.");
             } catch (e) {
                 console.error("Ralat Konfigurasi Firebase:", e);
             }
@@ -79,11 +78,14 @@
             ]
         };
 
-        // --- 2. ICON COMPONENTS (SVG) ---
+        // --- 2. ICONS & UTILS ---
+        const { useState, useEffect, useMemo } = React;
+
         const IconBase = ({ children, className }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
         );
         
+        // Icon set definitions
         const Icons = {
             MapPin: (p) => <IconBase {...p}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></IconBase>,
             User: (p) => <IconBase {...p}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></IconBase>,
@@ -113,10 +115,6 @@
             UsersIcon: (p) => <IconBase {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></IconBase>
         };
 
-        // --- 3. GLOBAL VARIABLES ---
-        const { useState, useEffect, useMemo } = React;
-
-        // --- 4. UTILS ---
         const formatDate = (dateString) => {
             if (!dateString) return '-';
             const parts = dateString.split('-');
@@ -144,7 +142,8 @@
             document.body.removeChild(link);
         };
 
-        // --- 5. UI COMPONENTS ---
+        // --- 3. COMPONENTS ---
+
         const SuccessModal = ({ isOpen, onClose, message }) => {
             if (!isOpen) return null;
             return (
@@ -227,8 +226,6 @@
                 </div>
             );
         };
-
-        // ... DASHBOARD COMPONENTS ...
 
         const LoginPage = ({ onLogin, onRegister, error, usersLoading }) => {
             const [isRegistering, setIsRegistering] = useState(false);
@@ -589,8 +586,24 @@
             const handleAddLog = (newLogData) => {
                 const newEntry = { userId: user.id, userName: user.name, ...newLogData, createdAt: new Date() };
                 if (db && !dbError) {
-                    db.collection('egerak_logs').add(newEntry).then(() => setShowSuccessModal(true));
+                    // 1. Add the log
+                    db.collection('egerak_logs').add(newEntry);
+                    
+                    // 2. AUTO-ADD LOCATION to master list if it doesn't exist
+                    const existingLoc = locations.find(l => l.name === newLogData.location);
+                    if (!existingLoc && newLogData.location) {
+                         db.collection('egerak_locations').add({ name: newLogData.location });
+                    }
+
+                    // 3. AUTO-ADD ACTIVITY to master list if it doesn't exist
+                    const existingType = activityTypes.find(t => t.name === newLogData.type);
+                    if (!existingType && newLogData.type) {
+                         db.collection('egerak_activities').add({ name: newLogData.type });
+                    }
+
+                    setShowSuccessModal(true);
                 } else {
+                    // Demo Mode
                     setLogs([{ id: Date.now().toString(), ...newEntry }, ...logs]);
                     setShowSuccessModal(true);
                 }
@@ -623,16 +636,13 @@
 
             // --- COMPUTED DATA ---
             const combinedLocations = useMemo(() => {
-                const logLocs = logs.map(l => l.location).filter(Boolean);
-                const masterLocs = locations.map(l => l.name || l); // Handle string or obj
-                return Array.from(new Set([...masterLocs, ...logLocs])).sort();
-            }, [logs, locations]);
+                // In this version, we trust the locations state because we auto-add to it on submission
+                return locations.map(l => l.name || l).sort();
+            }, [locations]);
 
             const combinedActivityTypes = useMemo(() => {
-                const logTypes = logs.map(l => l.type).filter(Boolean);
-                const masterTypes = activityTypes.map(l => l.name || l);
-                return Array.from(new Set([...masterTypes, ...logTypes])).sort();
-            }, [logs, activityTypes]);
+                return activityTypes.map(l => l.name || l).sort();
+            }, [activityTypes]);
 
             const allUsers = useMemo(() => {
                 const logUserNames = logs.map(l => l.userName);
