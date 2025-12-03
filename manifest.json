@@ -1,12 +1,17 @@
 {
   "name": "E-Gerak PPD Ranau",
   "short_name": "E-Gerak",
-  "start_url": ".",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#1e3a8a",
-  "description": "Sistem Jejak Pergerakan Pegawai PPD Ranau",
+  "orientation": "portrait",
   "icons": [
+    {
+      "src": "icon-152.png",
+      "sizes": "152x152",
+      "type": "image/png"
+    },
     {
       "src": "icon-192.png",
       "sizes": "192x192",
@@ -15,7 +20,8 @@
     {
       "src": "icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
